@@ -1,3 +1,41 @@
+class ProjectState {
+  private projects: any[] = [];
+  private static instance: ProjectState;
+  private listeners: Function[] = [];
+
+  private constructor() {}
+
+  static getInstance(): ProjectState {
+    if (this.instance) {
+      return this.instance;
+    }
+    this.instance = new ProjectState();
+    return this.instance;
+  }
+
+  addProject(title: string, desc: string, numOfPeople: number) {
+    const proj = {
+      title: title,
+      description: desc,
+      people: numOfPeople,
+    };
+    this.projects.push(proj);
+    this.handleListeners();
+  }
+
+  handleListeners() {
+    this.listeners.map((func) => {
+      func(this.projects.slice());
+    });
+  }
+
+  addListener(func: Function) {
+    this.listeners.push(func);
+  }
+}
+
+const projectState = ProjectState.getInstance();
+
 interface Validatible {
   value: string | number;
   required?: boolean;
@@ -30,6 +68,7 @@ class ProjectList {
   templateElement: HTMLTemplateElement;
   hostElement: HTMLDivElement;
   element: HTMLElement;
+  assignedProjects: any[];
 
   constructor(private type: 'active' | 'finished') {
     this.templateElement = document.getElementById('project-list')! as HTMLTemplateElement;
@@ -38,9 +77,24 @@ class ProjectList {
     const importedNode = document.importNode(this.templateElement.content, true);
     this.element = importedNode.firstElementChild as HTMLElement;
     this.element.id = `${this.type}-projects`;
+    this.assignedProjects = [];
+
+    projectState.addListener((projects: any[]) => {
+      this.assignedProjects = [...this.assignedProjects, ...projects];
+      this.renderProjects();
+    });
 
     this.attach();
     this.renderContent();
+  }
+
+  private renderProjects() {
+    const listEl = document.getElementById(`${this.type}-projects-list`)!;
+    this.assignedProjects.map((proj) => {
+      const listItem = document.createElement('li');
+      listItem.textContent = proj.title;
+      listEl.appendChild(listItem);
+    });
   }
 
   private renderContent() {
@@ -111,12 +165,20 @@ class ProjectInput {
     }
   };
 
+  private clearInputs() {
+    this.titleInputElement.value = '';
+    this.descriptionInputElement.value = '';
+    this.peopleInputElement.value = '';
+  }
+
   submitHandler = (event: Event) => {
     event.preventDefault();
     const userInput = this.gatherUserInput();
     if (userInput) {
       const [title, description, people] = userInput;
       console.log(title, description, people);
+      projectState.addProject(title, description, people);
+      this.clearInputs();
     }
   };
 
